@@ -1,15 +1,5 @@
-use ndarray::Array2;
 use crate::point2::Point2;
-
-pub fn display_char_grid(grid: &Array2<char>) -> String {
-    let mut string = String::new();
-    for row in grid.columns() {
-        string.extend(row);
-        string.push('\n');
-    }
-    string.pop();
-    string
-}
+use ndarray::Array2;
 
 #[derive(Debug, Clone)]
 pub enum Material {
@@ -21,6 +11,16 @@ enum MoveResult {
     Occupied,
     Vacant,
     Outside,
+}
+
+pub fn display_char_grid(grid: &Array2<char>) -> String {
+    let mut string = String::new();
+    for row in grid.columns() {
+        string.extend(row);
+        string.push('\n');
+    }
+    string.pop();
+    string
 }
 
 pub fn simulate_sand(grid: &mut Array2<Option<Material>>, source: &Point2<usize>, on_floor_y: i32) {
@@ -38,8 +38,6 @@ pub fn simulate_sand(grid: &mut Array2<Option<Material>>, source: &Point2<usize>
         x: 0..(grid.dim().0 as i32),
         y: 0..(grid.dim().1 as i32),
     };
-    // let grid_x_range = 0..(grid.dim().0 as i32);
-    // let grid_y_range = 0..(grid.dim().1 as i32);
 
     //simulation tracking
     let mut resting_sand = 0;
@@ -91,9 +89,9 @@ pub fn simulate_sand(grid: &mut Array2<Option<Material>>, source: &Point2<usize>
                     resting_sand += 1;
                     if sand_position == sand_start_position {
                         println!(
-                        "After {} resting sand particles: source is plugged by resting sand",
-                        resting_sand
-                    );
+                            "After {} resting sand particles: source is plugged by resting sand",
+                            resting_sand
+                        );
                         break 'simulate;
                     }
                     break;

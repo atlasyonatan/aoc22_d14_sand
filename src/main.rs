@@ -10,16 +10,15 @@ use crate::point2::Point2;
 
 pub mod simulation;
 use crate::simulation::{display_char_grid, simulate_sand, Material};
-type Line = (Point2<usize>, Point2<usize>);
 
 fn main() {
     //read input as rock formations
     let path = Path::new("../input.txt");
     let file = File::open(path).unwrap();
-    let mut rock_formations: Vec<Line> = io::BufReader::new(file)
+    let mut rock_formations: Vec<(Point2<usize>, Point2<usize>)> = io::BufReader::new(file)
         .lines()
         .map(|l| l.unwrap())
-        .flat_map(|l| -> Vec<Line> {
+        .flat_map(|l| -> Vec<(Point2<usize>, Point2<usize>)> {
             let vec: Vec<Point2<usize>> = l
                 .split("->")
                 .map(|s| {
