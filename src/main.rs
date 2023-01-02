@@ -6,7 +6,8 @@ use std::{
 };
 
 pub mod point2;
-type Point = point2::Point2<usize>;
+use crate::point2::Point2;
+type Point = Point2<usize>;
 type Line = (Point, Point);
 
 fn main() {
@@ -65,10 +66,10 @@ fn main() {
         let size = max - offset + Point { x: 1, y: 1 };
         let mut grid = Array2::from_elem((size.x, size.y), None);
         for (start, end) in rock_formations {
-            let start = start - min;
-            let end = end - min;
-            for x in start.x..=end.x {
-                for y in start.y..=end.y {
+            let start = start - offset;
+            let end = end - offset;
+            for x in start.x.min(end.x)..=start.x.max(end.x) {
+                for y in start.y.min(end.y)..=start.y.max(end.y) {
                     grid[[x, y]] = Some(Material::Rock);
                 }
             }
@@ -83,10 +84,72 @@ fn main() {
         Some(Material::Sand) => 'o',
         None => '.',
     });
+    display_grid[[source.x, source.y]] = '+';
 
+    let moves = [
+        Point2 { x: 0, y: 1 },
+        Point2 { x: -1, y: 1 },
+        Point2 { x: 1, y: 1 },
+    ];
+    //part 1{
+    let sand_start = Point2 {
+        x: source.x as i32,
+        y: source.y as i32,
+    };
+    let grid_x_range = 0..(grid.dim().0 as i32);
+    let grid_y_range = 0..(grid.dim().1 as i32);
+    let mut resting_sand = 0;
+    'simulate: loop {
+        let mut sand_position = sand_start.clone();
+        loop {
+            let possible_position = moves
+                .iter()
+                .map(|&step| sand_position + step)
+                .map(|p| {
+                    (
+                        p,
+                        match grid_x_range.contains(&p.x) && grid_y_range.contains(&p.y) {
+                            true => match grid[[p.x as usize, p.y as usize]] {
+                                Some(_) => MoveResult::Occupied,
+                                None => MoveResult::Vacant,
+                            },
+                            false => MoveResult::Outside,
+                        },
+                    )
+                })
+                .find(|(_, result)| match result {
+                    MoveResult::Occupied => false,
+                    _ => true,
+                });
+            match possible_position {
+                Some((new_position, result)) => match result {
+                    MoveResult::Outside => {
+                        break 'simulate;
+                    }
+                    _ => {
+                        //move sand to new_position
+                        sand_position = new_position;
+                    }
+                },
+                None => {
+                    //solidify sand at current position
+                    grid[[sand_position.x as usize, sand_position.y as usize]] =
+                        Some(Material::Sand);
+                    resting_sand += 1;
+                    break;
+                }
+            }
+        }
+    }
+    let mut display_grid = grid.map(|o| match o {
+        Some(Material::Rock) => '#',
+        Some(Material::Sand) => 'o',
+        None => '.',
+    });
     display_grid[[source.x, source.y]] = '+';
 
     println!("{}", display_char_grid(&display_grid));
+    println!("part 1: {}", resting_sand);
 }
 
 fn display_char_grid(grid: &Array2<char>) -> String {
@@ -103,4 +166,10 @@ fn display_char_grid(grid: &Array2<char>) -> String {
 enum Material {
     Sand,
     Rock,
+}
+
+enum MoveResult {
+    Occupied,
+    Vacant,
+    Outside,
 }
