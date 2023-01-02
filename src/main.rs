@@ -7,21 +7,24 @@ use std::{
 
 pub mod point2;
 use crate::point2::Point2;
-type Point = Point2<usize>;
-type Line = (Point, Point);
+
+pub mod simulation;
+use crate::simulation::{display_char_grid, simulate_sand, Material};
+type Line = (Point2<usize>, Point2<usize>);
 
 fn main() {
+    //read input as rock formations
     let path = Path::new("../input.txt");
     let file = File::open(path).unwrap();
     let mut rock_formations: Vec<Line> = io::BufReader::new(file)
         .lines()
         .map(|l| l.unwrap())
         .flat_map(|l| -> Vec<Line> {
-            let vec: Vec<Point> = l
+            let vec: Vec<Point2<usize>> = l
                 .split("->")
                 .map(|s| {
                     let mut iter = s.trim().split(',').map(|s| s.parse().unwrap());
-                    Point {
+                    Point2 {
                         x: iter.next().unwrap(),
                         y: iter.next().unwrap(),
                     }
@@ -32,9 +35,9 @@ fn main() {
                 .collect()
         })
         .collect();
-    let source = Point { x: 500, y: 0 };
+    let source = Point2 { x: 500, y: 0 };
 
-    //add floor
+    //add floor as rock formation
     let max_y = rock_formations
         .iter()
         .flat_map(|line| [line.0.y, line.1.y])
@@ -48,8 +51,8 @@ fn main() {
     };
     rock_formations.push((floor_center - radius, floor_center + radius));
 
-    //construct grid
-    let min = Point {
+    //construct grid with rock formations
+    let min = Point2 {
         x: rock_formations
             .iter()
             .flat_map(|line| [line.0.x, line.1.x])
@@ -63,7 +66,7 @@ fn main() {
             .min()
             .unwrap(),
     };
-    let max = Point {
+    let max = Point2 {
         x: rock_formations
             .iter()
             .flat_map(|line| [line.0.x, line.1.x])
@@ -77,7 +80,6 @@ fn main() {
             .max()
             .unwrap(),
     };
-
     let size = max - min + Point2 { x: 1, y: 1 };
     let input_offset = min;
 
@@ -92,123 +94,17 @@ fn main() {
             }
         }
     }
-
     let source = source - input_offset;
 
+    //simulate
+    simulate_sand(&mut grid, &source, floor_center.y as i32 - 1);
+
+    //display grid after simulation
     let mut display_grid = grid.map(|o| match o {
         Some(Material::Rock) => '#',
         Some(Material::Sand) => 'o',
         None => '.',
     });
     display_grid[[source.x, source.y]] = '+';
-
-    let moves = [
-        Point2 { x: 0, y: 1 },
-        Point2 { x: -1, y: 1 },
-        Point2 { x: 1, y: 1 },
-    ];
-    let sand_start = Point2 {
-        x: source.x as i32,
-        y: source.y as i32,
-    };
-    let grid_x_range = 0..(grid.dim().0 as i32);
-    let grid_y_range = 0..(grid.dim().1 as i32);
-    let mut resting_sand = 0;
-    let mut clean_floor = true;
-    let on_floor_y = floor_center.y as i32 - 1;
-    let source_i32 = Point2 {
-        x: source.x as i32,
-        y: source.y as i32,
-    };
-    'simulate: loop {
-        let mut sand_position = sand_start.clone();
-        loop {
-            let possible_position = moves
-                .iter()
-                .map(|&step| sand_position + step)
-                .map(|p| {
-                    (
-                        p,
-                        match grid_x_range.contains(&p.x) && grid_y_range.contains(&p.y) {
-                            true => match grid[[p.x as usize, p.y as usize]] {
-                                Some(_) => MoveResult::Occupied,
-                                None => MoveResult::Vacant,
-                            },
-                            false => MoveResult::Outside,
-                        },
-                    )
-                })
-                .find(|(_, result)| match result {
-                    MoveResult::Occupied => false,
-                    _ => true,
-                });
-            match possible_position {
-                Some((new_position, result)) => match result {
-                    MoveResult::Outside => {
-                        println!(
-                            "After {} resting sand particles: sand overflows to abyss",
-                            resting_sand
-                        );
-                        break 'simulate;
-                    }
-                    _ => {
-                        //move sand to new_position
-                        sand_position = new_position;
-                    }
-                },
-                None => {
-                    //solidify sand at current position
-                    grid[[sand_position.x as usize, sand_position.y as usize]] =
-                        Some(Material::Sand);
-                    resting_sand += 1;
-                    if sand_position == source_i32 {
-                        println!(
-                            "After {} resting sand particles: source is plugged by resting sand",
-                            resting_sand
-                        );
-                        break 'simulate;
-                    }
-                    break;
-                }
-            }
-            if clean_floor && sand_position.y == on_floor_y {
-                clean_floor = false;
-                println!(
-                    "After {} resting sand particles: sand pours on the floor",
-                    resting_sand
-                );
-            }
-        }
-    }
-
-    let mut display_grid = grid.map(|o| match o {
-        Some(Material::Rock) => '#',
-        Some(Material::Sand) => 'o',
-        None => '.',
-    });
-    display_grid[[source.x, source.y]] = '+';
-
     println!("{}", display_char_grid(&display_grid));
-}
-
-fn display_char_grid(grid: &Array2<char>) -> String {
-    let mut string = String::new();
-    for row in grid.columns() {
-        string.extend(row);
-        string.push('\n');
-    }
-    string.pop();
-    string
-}
-
-#[derive(Debug, Clone)]
-enum Material {
-    Sand,
-    Rock,
-}
-
-enum MoveResult {
-    Occupied,
-    Vacant,
-    Outside,
 }
