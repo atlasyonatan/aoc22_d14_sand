@@ -13,7 +13,7 @@ type Line = (Point, Point);
 fn main() {
     let path = Path::new("../input.txt");
     let file = File::open(path).unwrap();
-    let rock_formations: Vec<Line> = io::BufReader::new(file)
+    let mut rock_formations: Vec<Line> = io::BufReader::new(file)
         .lines()
         .map(|l| l.unwrap())
         .flat_map(|l| -> Vec<Line> {
@@ -33,51 +33,67 @@ fn main() {
         })
         .collect();
     let source = Point { x: 500, y: 0 };
-    let (mut grid, offset) = {
-        let min = Point {
-            x: rock_formations
-                .iter()
-                .flat_map(|line| [line.0.x, line.1.x])
-                .chain([source.x])
-                .min()
-                .unwrap(),
-            y: rock_formations
-                .iter()
-                .flat_map(|line| [line.0.y, line.1.y])
-                .chain([source.y])
-                .min()
-                .unwrap(),
-        };
-        let max = Point {
-            x: rock_formations
-                .iter()
-                .flat_map(|line| [line.0.x, line.1.x])
-                .chain([source.x])
-                .max()
-                .unwrap(),
-            y: rock_formations
-                .iter()
-                .flat_map(|line| [line.0.y, line.1.y])
-                .chain([source.y])
-                .max()
-                .unwrap(),
-        };
-        let offset = min;
-        let size = max - offset + Point { x: 1, y: 1 };
-        let mut grid = Array2::from_elem((size.x, size.y), None);
-        for (start, end) in rock_formations {
-            let start = start - offset;
-            let end = end - offset;
-            for x in start.x.min(end.x)..=start.x.max(end.x) {
-                for y in start.y.min(end.y)..=start.y.max(end.y) {
-                    grid[[x, y]] = Some(Material::Rock);
-                }
-            }
-        }
-        (grid, min)
+
+    //add floor
+    let max_y = rock_formations
+        .iter()
+        .flat_map(|line| [line.0.y, line.1.y])
+        .chain([source.y])
+        .max()
+        .unwrap();
+    let floor_center = source + Point2 { x: 0, y: max_y + 2 };
+    let radius = Point2 {
+        x: floor_center.y,
+        y: 0,
+    };
+    rock_formations.push((floor_center - radius, floor_center + radius));
+
+    //construct grid
+    let min = Point {
+        x: rock_formations
+            .iter()
+            .flat_map(|line| [line.0.x, line.1.x])
+            .chain([source.x])
+            .min()
+            .unwrap(),
+        y: rock_formations
+            .iter()
+            .flat_map(|line| [line.0.y, line.1.y])
+            .chain([source.y])
+            .min()
+            .unwrap(),
+    };
+    let max = Point {
+        x: rock_formations
+            .iter()
+            .flat_map(|line| [line.0.x, line.1.x])
+            .chain([source.x])
+            .max()
+            .unwrap(),
+        y: rock_formations
+            .iter()
+            .flat_map(|line| [line.0.y, line.1.y])
+            .chain([source.y])
+            .max()
+            .unwrap(),
     };
 
-    let source = source - offset;
+    let size = max - min + Point2 { x: 1, y: 1 };
+    let input_offset = min;
+
+    //fill grid with input cave formations
+    let mut grid = Array2::from_elem((size.x, size.y), None);
+    for (start, end) in rock_formations {
+        let start = start - input_offset;
+        let end = end - input_offset;
+        for x in start.x.min(end.x)..=start.x.max(end.x) {
+            for y in start.y.min(end.y)..=start.y.max(end.y) {
+                grid[[x, y]] = Some(Material::Rock);
+            }
+        }
+    }
+
+    let source = source - input_offset;
 
     let mut display_grid = grid.map(|o| match o {
         Some(Material::Rock) => '#',
@@ -91,7 +107,6 @@ fn main() {
         Point2 { x: -1, y: 1 },
         Point2 { x: 1, y: 1 },
     ];
-    //part 1{
     let sand_start = Point2 {
         x: source.x as i32,
         y: source.y as i32,
@@ -99,6 +114,12 @@ fn main() {
     let grid_x_range = 0..(grid.dim().0 as i32);
     let grid_y_range = 0..(grid.dim().1 as i32);
     let mut resting_sand = 0;
+    let mut clean_floor = true;
+    let on_floor_y = floor_center.y as i32 - 1;
+    let source_i32 = Point2 {
+        x: source.x as i32,
+        y: source.y as i32,
+    };
     'simulate: loop {
         let mut sand_position = sand_start.clone();
         loop {
@@ -124,6 +145,10 @@ fn main() {
             match possible_position {
                 Some((new_position, result)) => match result {
                     MoveResult::Outside => {
+                        println!(
+                            "After {} resting sand particles: sand overflows to abyss",
+                            resting_sand
+                        );
                         break 'simulate;
                     }
                     _ => {
@@ -136,11 +161,26 @@ fn main() {
                     grid[[sand_position.x as usize, sand_position.y as usize]] =
                         Some(Material::Sand);
                     resting_sand += 1;
+                    if sand_position == source_i32 {
+                        println!(
+                            "After {} resting sand particles: source is plugged by resting sand",
+                            resting_sand
+                        );
+                        break 'simulate;
+                    }
                     break;
                 }
             }
+            if clean_floor && sand_position.y == on_floor_y {
+                clean_floor = false;
+                println!(
+                    "After {} resting sand particles: sand pours on the floor",
+                    resting_sand
+                );
+            }
         }
     }
+
     let mut display_grid = grid.map(|o| match o {
         Some(Material::Rock) => '#',
         Some(Material::Sand) => 'o',
@@ -149,7 +189,6 @@ fn main() {
     display_grid[[source.x, source.y]] = '+';
 
     println!("{}", display_char_grid(&display_grid));
-    println!("part 1: {}", resting_sand);
 }
 
 fn display_char_grid(grid: &Array2<char>) -> String {
